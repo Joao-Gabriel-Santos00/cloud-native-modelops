@@ -1,0 +1,94 @@
+# templates/minio.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Use the size from values.yaml
+      storage: {{ .Values.minio.persistence.size }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+spec:
+  type: NodePort
+  selector:
+    app: minio
+  ports:
+    - name: api
+      protocol: TCP
+      port: 9000
+      targetPort: 9000
+    - name: console
+      protocol: TCP
+      port: 9001
+      targetPort: 9001
+      # Use the port from values.yaml
+      nodePort: {{ .Values.minio.service.consoleNodePort }}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-deployment
+spec:
+  # Use the replica count from values.yaml
+  replicas: {{ .Values.minio.replicaCount }}
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        # Build the image name from values.yaml
+        image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        ports:
+        - containerPort: 9000
+        - containerPort: 9001
+        {{- if .Values.minio.probes.enabled }}
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        {{- end }}
+        resources:
+          requests:
+            cpu: {{ .Values.minio.resources.requests.cpu }}
+            memory: {{ .Values.minio.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.minio.resources.limits.cpu }}
+            memory: {{ .Values.minio.resources.limits.memory }}
+        envFrom:
+        - secretRef:
+            # Use the secret name from values.yaml
+            name: {{ .Values.minio.existingSecret }}
+        command: ["minio", "server", "/data", "--console-address", ":9001"]
+        volumeMounts:
+          - name: minio-storage
+            mountPath: /data
+      volumes:
+        - name: minio-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc

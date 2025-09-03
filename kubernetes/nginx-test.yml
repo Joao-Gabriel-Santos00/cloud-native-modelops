@@ -1,0 +1,39 @@
+# nginx-test.yml
+
+# 1. The Deployment: Defines the desired state for our pods.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1 # We want one copy (pod) of our application running.
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest # The Docker image to use.
+        ports:
+        - containerPort: 80 # The port the container is listening on.
+
+--- # This separator lets us define multiple resources in one file.
+
+# 2. The Service: Exposes our deployment to the network.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  type: NodePort # This type makes the service accessible from outside the cluster.
+  selector:
+    app: nginx # This connects the service to the pods with the 'app: nginx' label.
+  ports:
+    - protocol: TCP
+      port: 80       # The port inside the cluster.
+      targetPort: 80 # The port on the container.
+      nodePort: 30080  # The external port we will use. You can pick any from 30000-32767

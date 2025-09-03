@@ -1,0 +1,56 @@
+# kubernetes/mlflow.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  # This name is CRITICAL. It's the DNS name your model-server is looking for.
+  name: mlflow-service
+spec:
+  # Expose this service with a NodePort so you can access the UI from your browser
+  type: NodePort
+  selector:
+    app: mlflow # This service will route traffic to any pod with this label
+  ports:
+    - protocol: TCP
+      port: 5000       # The internal port for the service
+      targetPort: 5000 # The port the MLflow container is listening on
+      nodePort: 30082  # A new external port for the UI
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.12.1
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: "http://minio-service:9000"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_PASSWORD
+        command: ["mlflow", "server",
+                  "--host", "0.0.0.0",
+                  "--port", "5000",
+                  "--default-artifact-root", "s3://mlflow/"]

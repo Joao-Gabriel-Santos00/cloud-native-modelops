@@ -1,0 +1,105 @@
+# values.yaml - Our central configuration file
+
+# Default image pull policy
+imagePullPolicy: IfNotPresent
+
+# -- Redis Configuration --
+redis:
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: "7"
+  probes:
+    enabled: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+# -- MinIO Configuration --
+minio:
+  replicaCount: 1
+  image:
+    repository: minio/minio
+    tag: "RELEASE.2023-07-21T21-12-44Z"
+  service:
+    # Port for the MinIO Web Console/UI
+    consoleNodePort: 30083
+  persistence:
+    # How much storage to request for MinIO data
+    size: 1Gi
+  # Name of the Kubernetes secret holding credentials
+  existingSecret: minio-secret
+  probes:
+    enabled: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# -- MLflow Configuration --
+mlflow:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/mlflow/mlflow
+    tag: "v2.12.1"
+  service:
+    # Port for the MLflow Web UI
+    nodePort: 30082
+  # The name of the S3 bucket MLflow will use
+  s3BucketName: mlflow
+  probes:
+    enabled: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# -- Model Server Configuration --
+modelServer:
+  replicaCount: 1
+  image:
+    # IMPORTANT: Change this to your username and latest working tag!
+    repository: joaogabrielpos/model-server
+    tag: "0.2"
+  service:
+    # Port for the FastAPI UI
+    nodePort: 30081
+  probes:
+    # Configuration for the readiness probe
+    readiness:
+      initialDelaySeconds: 15 # Wait 15s after pod starts before first probe
+      periodSeconds: 10       # Probe every 10 seconds
+      timeoutSeconds: 5
+      failureThreshold: 3
+    # Configuration for the liveness probe
+    liveness:
+      initialDelaySeconds: 30 # Wait 30s before first probe
+      periodSeconds: 15       # Probe every 15 seconds
+      timeoutSeconds: 5
+      failureThreshold: 3
+  resources:
+    requests:
+      cpu: "100m"    # 100 millicpu (0.1 of a CPU core)
+      memory: "128Mi" # 128 Mebibytes
+    limits:
+      cpu: "500m"    # 500 millicpu (0.5 of a CPU core)
+      memory: "512Mi" # 512 Mebibytes
+
+# -- NGINX (for testing, can be removed later) --
+nginx:
+  replicaCount: 1
+  image:
+    repository: nginx
+    tag: "latest"
+  service:
+    nodePort: 30080

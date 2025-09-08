@@ -1,19 +1,17 @@
 # kubernetes/redis.yml
-
+{{- if .Values.redis.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  # This name MUST match the REDIS_HOST value in your model-server-config ConfigMap.
   name: redis-service
 spec:
-  # 'ClusterIP' is the default service type. It's only reachable inside the cluster.
   type: ClusterIP
   selector:
-    app: redis # This service routes traffic to pods with this label.
+    app: redis 
   ports:
     - protocol: TCP
-      port: 6379       # The port the service will listen on.
-      targetPort: 6379 # The port the Redis container is listening on.
+      port: 6379       
+      targetPort: 6379 
 
 ---
 
@@ -29,11 +27,10 @@ spec:
   template:
     metadata:
       labels:
-        app: redis # The label the Service selector is looking for.
+        app: redis 
     spec:
       containers:
       - name: redis
-        # We can use the official public image for Redis.
         image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
         ports:
         - containerPort: 6379
@@ -56,3 +53,5 @@ spec:
           limits:
             cpu: {{ .Values.redis.resources.limits.cpu }}
             memory: {{ .Values.redis.resources.limits.memory }}
+
+{{- end }}

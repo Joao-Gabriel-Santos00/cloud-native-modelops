@@ -1,7 +1,8 @@
-# values.yaml for LOCAL testing
+# values-cloud.yaml
 
 imagePullPolicy: IfNotPresent
 
+# --- Redis (Internal Service) ---
 redis:
   enabled: true
   replicaCount: 1
@@ -9,64 +10,57 @@ redis:
   probes: { enabled: true }
   resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
 
+# --- MinIO (Disabled for Cloud) ---
 minio:
-  enabled: true
-  replicaCount: 1
-  image: { repository: minio/minio, tag: "RELEASE.2023-07-21T21-12-44Z" }
-  service: { type: NodePort, consoleNodePort: 30083 }
-  persistence: { size: 1Gi }
-  existingSecret: minio-secret
-  probes: { enabled: true }
-  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 1Gi } }
+  enabled: false # We are using AWS S3 instead.
 
+# --- MLflow (Public-Facing Service) ---
 mlflow:
   enabled: true
-  serviceAccountName: default
+  serviceAccountName: s3-access-sa
   replicaCount: 1
   image: { repository: ghcr.io/mlflow/mlflow, tag: "v2.12.1" }
-  service: { type: NodePort, nodePort: 30082, port: 5000 }
-  s3BucketName: mlflow
+  service: { type: LoadBalancer, port: 5000 } # <-- CHANGED
+  
+  s3BucketName: jgpos-mlflow-bucket-s3 # <-- CHANGE THIS
   probes: { enabled: true }
   resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
-  env:
-    MLFLOW_S3_ENDPOINT_URL: "http://minio-service:9000"
-    AWS_ACCESS_KEY_ID: "minioadmin"
-    AWS_SECRET_ACCESS_KEY: "minioadmin"
+  env: {} # This is empty because credentials come from the IAM Role.
 
+# --- Model Server (Public-Facing Service) ---
 modelServer:
   enabled: true
-  serviceAccountName: default
+  serviceAccountName: s3-access-sa
   replicaCount: 1
-  image: { repository: joaogabrielpos/model-server, tag: "0.2" } # <-- CHANGE THIS
-  service: { type: NodePort, nodePort: 30081, port: 8000 }
+  image: { repository: joaogabrielpos/model-server, tag: "0.2" } # <-- VERIFY THIS IS YOUR LATEST TAG
+  service: { type: LoadBalancer, port: 8000 } # <-- CHANGED
   probes: { liveness: { initialDelaySeconds: 30, periodSeconds: 15 }, readiness: { initialDelaySeconds: 15, periodSeconds: 10 } }
   resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-  env:
+  env: # This only contains internal cluster communication, no secrets.
     MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
     REDIS_HOST: "redis-service"
     REDIS_PORT: "6379"
-    MLFLOW_S3_ENDPOINT_URL: "http://minio-service:9000"
-    AWS_ACCESS_KEY_ID: "minioadmin"
-    AWS_SECRET_ACCESS_KEY: "minioadmin"
-
+    AWS_REGION: "eu-west-3"
+    MLFLOW_S3_ENDPOINT_URL: "https://s3.eu-west-3.amazonaws.com"
+# --- Prometheus (Internal Service) ---
 prometheus:
   enabled: true
   replicaCount: 1
   image: { repository: prom/prometheus, tag: "latest" }
   resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 256Mi } }
 
+# --- Grafana (Public-Facing Service) ---
 grafana:
   enabled: true
   replicaCount: 1
   image: { repository: grafana/grafana, tag: "latest" }
-  service: { type: NodePort, nodePort: 30084, port: 3000 } 
+  service: { type: LoadBalancer, port: 3000 } # <-- CHANGED
   resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
 
+# --- Frontend (Public-Facing Service) ---
 frontend:
   enabled: true
   replicaCount: 1
-  image: { repository: joaogabrielpos/modelops-frontend, tag: "0.1" } # <-- CHANGE THIS
-  service: { type: NodePort, nodePort: 30085, port: 5173 } 
+  image: { repository: joaogabrielpos/modelops-frontend, tag: "prod-0.6" } # <-- VERIFY THIS IS YOUR LATEST TAG
+  service: { type: LoadBalancer, port: 80 } # <-- CHANGED
   resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
-  env:
-    apiBaseUrl: "http://localhost:30081"

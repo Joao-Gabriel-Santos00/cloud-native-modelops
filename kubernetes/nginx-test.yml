@@ -6,7 +6,7 @@ kind: Deployment
 metadata:
   name: nginx-deployment
 spec:
-  replicas: 1 # We want one copy (pod) of our application running.
+  replicas: 1 
   selector:
     matchLabels:
       app: nginx
@@ -17,11 +17,11 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:latest # The Docker image to use.
+        image: nginx:latest 
         ports:
-        - containerPort: 80 # The port the container is listening on.
+        - containerPort: 80 
 
---- # This separator lets us define multiple resources in one file.
+--- 
 
 # 2. The Service: Exposes our deployment to the network.
 apiVersion: v1
@@ -29,11 +29,11 @@ kind: Service
 metadata:
   name: nginx-service
 spec:
-  type: NodePort # This type makes the service accessible from outside the cluster.
+  type: NodePort 
   selector:
-    app: nginx # This connects the service to the pods with the 'app: nginx' label.
+    app: nginx 
   ports:
     - protocol: TCP
-      port: 80       # The port inside the cluster.
-      targetPort: 80 # The port on the container.
-      nodePort: 30080  # The external port we will use. You can pick any from 30000-32767
+      port: 80       
+      targetPort: 80
+      nodePort: 30080  

@@ -1,5 +1,5 @@
 # templates/minio.yml
-
+{{- if .Values.minio.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -92,3 +92,4 @@ spec:
         - name: minio-storage
           persistentVolumeClaim:
             claimName: minio-pvc
+{{- end }}

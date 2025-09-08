@@ -1,0 +1,19 @@
+# templates/prometheus-configmap.yml
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      - job_name: 'model-server'
+        # This is the important line: it uses Kubernetes' internal DNS.
+        static_configs:
+          - targets: ['model-server-service:8000']
+{{- end }}

@@ -1,0 +1,20 @@
+# trainer-job.yml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-trainer-job
+spec:
+  template:
+    spec:
+      serviceAccountName: s3-access-sa
+      containers:
+      - name: trainer
+        image: joaogabrielpos/trainer:latest # <-- VERIFY THIS IS YOUR LATEST TRAINER TAG
+        command: ["python", "services/trainer/train.py", "--model-name", "ModelOpsStudioModel"]
+        env:
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow-service:5000"
+        - name: AWS_REGION # Adding region is a best practice for boto3
+          value: "eu-west-3"
+      restartPolicy: Never
+  backoffLimit: 2

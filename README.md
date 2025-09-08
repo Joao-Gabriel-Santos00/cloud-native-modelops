@@ -1,109 +1,120 @@
 # Cloud-Native ModelOps Platform
 
-This project contains the Kubernetes manifests and Helm chart for deploying a complete, end-to-end MLOps platform. It takes the services from the [ModelOps Studio](https://github.com/Joao-Gabriel-Santos00/modelops-studio) project and packages them for a production-style, cloud-native environment. The final deliverable is a single Helm chart that can deploy the entire resilient and observable stack with one command.
+This project contains the Kubernetes manifests and Helm chart for deploying a MLOps platform. It takes the services from the [ModelOps Studio](https://github.com/Joao-Gabriel-Santos00/modelops-studio) project and packages them for a cloud environment.
+
+The project demonstrates two key deployment targets:
+1.  A **local deployment** on Docker Desktop, using MinIO for S3-compatible storage.
+2.  A **cloud deployment** on **Amazon EKS**, using a native **Amazon S3** bucket and secure IAM roles for pod authentication.
+
+The final deliverable is a configurable Helm chart that can deploy the entire stack to either environment.
 
 ## Why I Built This Project
 
-I built this project as the next evolution of my MLOps Studio platform to demonstrate my skills in deploying complex, multi-service applications onto a production-grade orchestration platform. The core challenge was to move beyond a local `docker-compose` setup and re-architect the entire platform for Kubernetes, the industry standard for container orchestration.
-
-By packaging the system into a single, reusable Helm chart and implementing production-readiness features like health checks and resource management, this project serves as tangible proof of my ability to manage the full lifecycle of an ML system—from local development to scalable, cloud-native deployment.
+I built this project to demonstrate the full lifecycle of a ML system, from local development to cloud deployment. The core challenge was to move beyond a `docker-compose` setup and adapt the project for **Kubernetes**.
 
 ## Architecture
 
-The entire platform runs within a local Kubernetes cluster. The services are designed to be decoupled and communicate over the internal Kubernetes network. State is persisted using Kubernetes Persistent Volumes, ensuring data for services like MinIO survives pod restarts and redeployments.
+The platform is designed as a set of microservices orchestrated by Kubernetes. For cloud deployments, the MinIO object store is disabled and replaced by a native AWS S3 bucket, with pods securely authenticating via IAM Roles for Service Accounts (IRSA).
 
-![Architecture Diagram](docs/architecture.png)
-*(Note: You will need to create this diagram using a tool like Excalidraw or Diagrams.net and place it in a `docs` folder)*
+## Key Features & Concepts
 
-## Key Features & Concepts Demonstrated
+*   **Cloud & Local Deployment:** The Helm chart is configurable to deploy the entire stack to both a local Kubernetes cluster and a cloud provider (**Amazon EKS**).
+*   **Infrastructure as Code (IaC):** The entire application and its configurations are packaged into a **Helm chart**. The cloud infrastructure itself was provisioned using **`eksctl`** declarative manifests.
+*   **Cloud Service Integration:** Replaced the local MinIO object store with a managed **Amazon S3** bucket for model artifact storage in the cloud environment.
+*   **Secure Cloud Authentication:** Implemented **IAM Roles for Service Accounts (IRSA)** to provide pods with secure, temporary, and fine-grained permissions to access AWS S3 without long-lived credentials.
 
-*   **Container Orchestration:** Deployed a multi-service, stateful application on Kubernetes, managing the full lifecycle of each component with declarative manifests.
-*   **Infrastructure as Code (IaC):** Packaged the entire platform into a reusable and configurable **Helm chart**, enabling one-command, version-controlled deployments.
-*   **Stateful Service Management:** Used `PersistentVolumeClaims` to provide stable, persistent storage for the MinIO object store, ensuring model artifacts are not lost.
-*   **Configuration Management:** Managed all application configuration (image tags, ports, resources, replica counts) centrally in a single `values.yaml` file for easy and safe updates.
-*   **Production Readiness:** Implemented **Liveness and Readiness probes** for all services, enabling Kubernetes to perform automated health checks and self-healing by restarting unhealthy pods.
-*   **Resource Management:** Defined CPU and memory **requests and limits** for all components, ensuring cluster stability and preventing resource contention.
+## Getting Started (Local Deployment)
 
-## Getting Started
-
-Follow these instructions to deploy the entire MLOps stack on your local machine.
+Follow these instructions to deploy the entire MLOps stack on your local machine for development and testing.
 
 ### Prerequisites
 
 *   **Docker Desktop:** with the Kubernetes engine enabled.
-*   **kubectl:** command-line tool for interacting with Kubernetes (included with Docker Desktop).
+*   **kubectl:** command-line tool for interacting with Kubernetes.
 *   **Helm v3:** the package manager for Kubernetes.
 
-### Deployment Steps
+### Local Deployment Steps
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/cloud-native-modelops.git
-    cd cloud-native-modelops
-    ```
-
-2.  **Update Configuration (IMPORTANT):** Before deploying, open `modelops-stack/values.yaml` and update the `modelServer.image.repository` value to point to your Docker Hub username.
-    ```yaml
-    # in modelops-stack/values.yaml
-    modelServer:
-      image:
-        repository: your-username/model-server # <-- CHANGE THIS
-        tag: "0.3" # Or your latest working tag
-    ```
-
-3.  **Deploy the MinIO Secret:** This secret is referenced by the Helm chart but managed separately.
+1.  **Deploy the MinIO Secret:**
     ```powershell
     kubectl apply -f kubernetes/minio-secret.yml
     ```
-
-4.  **Install the Helm Chart:** This single command will deploy all services, deployments, and configurations.
+2.  **Install the Helm Chart:** This command uses the default `values.yaml` for a local setup.
     ```powershell
     helm install modelops ./modelops-stack/
     ```
-
-5.  **Verify the Deployment:** Wait a minute or two for all containers to pull and start. You can watch the progress with:
+3.  **Verify the Deployment:**
     ```powershell
     kubectl get pods -w
     ```
-    Once all pods show `STATUS` as `Running`, the platform is ready.
+    Once all pods are `Running`, the platform is ready. The services can be accessed via the `NodePort` addresses listed in `values.yaml` (e.g., `http://localhost:30081/docs`).
 
-## Access Points & Usage
+---
 
-The services are exposed on your local machine via `NodePort` services.
+## Cloud Deployment & Performance (AWS EKS)
 
-| Service          | Address                   | Credentials             |
-| :--------------- | :------------------------ | :---------------------- |
-| MLflow UI        | `http://localhost:30082`  | N/A                     |
-| MinIO Console    | `http://localhost:30083`  | `minioadmin`/`minioadmin` |
-| Model Server API | `http://localhost:30081/docs` | N/A                     |
+To validate the platform's production readiness, the Helm chart was deployed to **Amazon EKS**. The MinIO component was disabled, and a native **Amazon S3** bucket was used for artifact storage.
 
-### End-to-End Test Flow
+### Cloud Deployment Proof
 
-1.  **Create MinIO Bucket:** Navigate to the MinIO Console, go to "Buckets," and create a new bucket named `mlflow`.
-2.  **Run Training Job:** Execute the following PowerShell command to run a training job, which registers a model in MLflow and stores the artifact in MinIO. (Remember to use your trainer image name).
-    ```powershell
-    kubectl run model-trainer `
-      --image=your-username/trainer:latest `
-      --env="MLFLOW_TRACKING_URI=http://mlflow-service:5000" `
-      --env="MLFLOW_S3_ENDPOINT_URL=http://minio-service:9000" `
-      --env="AWS_ACCESS_KEY_ID=minioadmin" `
-      --env="AWS_SECRET_ACCESS_KEY=minioadmin" `
-      --rm -it --restart=Never --command -- python services/trainer/train.py --model-name ModelOpsStudioModel
-    ```
-3.  **Deploy Model:** Go to the MLflow UI, find the `run_id` of the new run, and use the `/deploy` endpoint in the FastAPI UI to load the model.
-4.  **Get Prediction:** Use the `/predict` endpoint with a valid payload (a list of 30 numbers) to get a real-time prediction.
+The following screenshot shows the public endpoints created by AWS Elastic Load Balancers for the deployed services:
 
-## Configuration
+![AWS Service Endpoints](./docs/images/kubectl_get_svc.png)
 
-The entire stack is configured via the `modelops-stack/values.yaml` file
+Model artifacts were trained and stored in the S3 bucket, as shown in the AWS Console:
+
+![S3 Artifacts](./docs/images/s3_artifacts.png)
+
+### Performance Under Load
+
+A `k6` load test was executed against the public `model-server` endpoint on EKS. The platform demonstrated stability with a **0.00% error rate** while sustaining an average of **~152 requests/second**.
+
+The Grafana dashboard below shows the key performance indicators (Throughput, p95 Latency) during the peak of the 4-minute load test.
+
+**Throughput (Requests per Second):**
+![Throughput Graph](./docs/images/grafana-throughput.png)
+
+**p95 Latency (milliseconds):**
+![Latency Graph](./docs/images/grafana-latency.png)
+
+Throughput was excellent and consistent, averaging **152 requests/second** on the AWS EKS cluster, slightly exceeding the local performance. The p95 latency increased from 180ms to ~524ms, which is an expected and acceptable trade-off resulting from real-world network overhead and the AWS Load Balancer layer. This confirms the application's architecture is robust and performs as expected under a realistic, simulated load. You can see the original local test results in the [ModelOps Studio project README](https://github.com/Joao-Gabriel-Santos00/modelops-studio) for a direct comparison.
+
+### k6 Load Test Results (Cloud)
+  █ TOTAL RESULTS
+
+    checks_total.......: 75890   303.477737/s
+    checks_succeeded...: 100.00% 75890 out of 75890
+    checks_failed......: 0.00%   0 out of 75890
+
+    ✓ status is 200
+    ✓ response contains prediction
+
+    HTTP
+    http_req_duration..............: avg=281.47ms min=36.74ms med=277.1ms  max=869.86ms p(90)=462.18ms p(95)=523.86ms
+      { expected_response:true }...: avg=281.47ms min=36.74ms med=277.1ms  max=869.86ms p(90)=462.18ms p(95)=523.86ms
+      { type:predict }.............: avg=281.47ms min=36.74ms med=277.1ms  max=869.86ms p(90)=462.18ms p(95)=523.86ms
+    http_req_failed................: 0.00%  0 out of 37945
+    http_reqs......................: 37945  151.738869/s
+
+    EXECUTION
+    iteration_duration.............: avg=331.93ms min=86.99ms med=327.57ms max=920.31ms p(90)=512.6ms  p(95)=574.36ms
+    iterations.....................: 37945  151.738869/s
+    vus............................: 1      min=1          max=99
+    vus_max........................: 100    min=100        max=100
+
+    data_received..................: 9.3 MB 37 kB/s
+    data_sent......................: 30 MB  119 kB/s
+
+
+
+
+running (4m10.1s), 000/100 VUs, 37945 complete and 0 interrupted iterations
+default ✓ [======================================] 000/100 VUs  4m10s
+
 
 ## Next Steps & Future Work
 
-This project successfully completes the "Scalability Proof" groundwork from the original ModelOps Studio. To further advance this toward a true enterprise-grade system, the following areas would be tackled next:
+To further advance this project, the following areas would be tackled next:
 
-*   **GitOps for CI/CD:** Integrate a GitOps tool like ArgoCD or FluxCD. This would create a fully automated CI/CD pipeline where merging a change to the Helm chart in Git automatically triggers a deployment to the Kubernetes cluster.
-
-*   **Automated Training Pipelines:** Integrate a workflow orchestrator like Apache Airflow (running on Kubernetes) to replace the manual kubectl run command for training. This would enable scheduled retraining or trigger-based retraining (e.g., on data drift).
-
-*   **True Cloud Deployment:** Deploy this Helm chart to a managed Kubernetes service (like AWS EKS, GKE, or AKS) and replace the MinIO NodePort with a cloud-native Ingress controller and the minio-secret with a managed secret store (like AWS Secrets Manager).
-  
+*   **GitOps for CI/CD:** Integrate a GitOps tool like **ArgoCD** so when merging a change to the Helm chart in Git automatically triggers a deployment to the Kubernetes cluster.
+*   **Automated Training Pipelines:** Integrate a workflow orchestrator like **Apache Airflow** (running on Kubernetes) to replace the manual `Job` file for training.

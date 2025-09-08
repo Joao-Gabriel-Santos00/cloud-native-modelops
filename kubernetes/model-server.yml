@@ -8,8 +8,6 @@ data:
   MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"
-  # --- THIS LINE IS NEW ---
-  # We need to tell the model-server's MLflow client where to find S3 (MinIO).
   MLFLOW_S3_ENDPOINT_URL: "http://minio-service:9000"
 
 ---
@@ -46,14 +44,12 @@ spec:
     spec:
       containers:
       - name: model-server
-        image: your-username/model-server:0.2 # Make sure this is your latest working tag
+        image: joaogabrielpos/model-server:0.2 
         ports:
         - containerPort: 8000
         envFrom:
         - configMapRef:
             name: model-server-config
-        # --- THIS SECTION IS NEW ---
-        # We also need to load the MinIO credentials from our secret.
         env:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:

@@ -1,0 +1,46 @@
+# templates/grafana-configmap.yml
+{{- if .Values.grafana.enabled }}
+# This ConfigMap defines the Prometheus datasource for Grafana.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+data:
+  datasource.yml: |-
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus-service:9090
+      isDefault: true
+---
+# This ConfigMap tells Grafana's provisioner where to look for dashboard files.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+data:
+  dashboards.yml: |-
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards
+---
+# This ConfigMap holds the actual JSON content of our dashboard.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-json
+data:
+  # The key here MUST match the filename of your dashboard.
+  model_server.json: |-
+{{ (.Files.Get "dashboards/model_server.json") | indent 4 }}
+---
+{{- end }}

@@ -1,19 +1,20 @@
 # templates/mlflow.yml
-
+{{- if .Values.mlflow.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: mlflow-service
 spec:
-  type: NodePort
+  type: {{ .Values.mlflow.service.type | default "NodePort" }}
   selector:
     app: mlflow
   ports:
     - protocol: TCP
-      port: 5000
+      port: {{ .Values.mlflow.service.port }}
       targetPort: 5000
-      # Use the port from values.yaml
+      {{- if eq .Values.mlflow.service.type "NodePort" }}
       nodePort: {{ .Values.mlflow.service.nodePort }}
+      {{- end }}
 
 ---
 
@@ -22,7 +23,6 @@ kind: Deployment
 metadata:
   name: mlflow-deployment
 spec:
-  # Use replica count from values.yaml
   replicas: {{ .Values.mlflow.replicaCount }}
   selector:
     matchLabels:
@@ -32,13 +32,20 @@ spec:
       labels:
         app: mlflow
     spec:
+      serviceAccountName: {{ .Values.mlflow.serviceAccountName | default "default" }}
       containers:
       - name: mlflow
-        # Build image name from values.yaml
         image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         ports:
         - containerPort: 5000
+        {{- if .Values.mlflow.env }}
+        env:
+        {{- range $key, $value := .Values.mlflow.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.mlflow.probes.enabled }}
         readinessProbe:
           httpGet:
@@ -60,23 +67,8 @@ spec:
           limits:
             cpu: {{ .Values.mlflow.resources.limits.cpu }}
             memory: {{ .Values.mlflow.resources.limits.memory }}
-        env:
-        - name: MLFLOW_S3_ENDPOINT_URL
-          value: "http://minio-service:9000"
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              # Use the secret name from values.yaml
-              name: {{ .Values.minio.existingSecret }}
-              key: MINIO_ROOT_USER
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              # Use the secret name from values.yaml
-              name: {{ .Values.minio.existingSecret }}
-              key: MINIO_ROOT_PASSWORD
-        # Build the command from values.yaml
         command: ["mlflow", "server",
-                  "--host", "0.0.0.0",
-                  "--port", "5000",
-                  "--default-artifact-root", "s3://{{ .Values.mlflow.s3BucketName }}/"]
+              "--host", "0.0.0.0",
+              "--port", "5000",
+              "--default-artifact-root", "s3://{{ .Values.mlflow.s3BucketName }}/"]
+{{- end}}

@@ -1,0 +1,51 @@
+# templates/prometheus.yml
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+spec:
+  type: ClusterIP # Internal service only
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+spec:
+  replicas: {{ .Values.prometheus.replicaCount }}
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: "{{ .Values.prometheus.image.repository }}:{{ .Values.prometheus.image.tag }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+        resources:
+          requests:
+            cpu: {{ .Values.prometheus.resources.requests.cpu }}
+            memory: {{ .Values.prometheus.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.prometheus.resources.limits.cpu }}
+            memory: {{ .Values.prometheus.resources.limits.memory }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-config
+{{- end }}
